@@ -1,0 +1,23 @@
+[package]
+
+name = "log-proc-macros"
+version = "0.1.0"
+authors = ["The Rust Project Developers"]
+license = "MIT of Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/rust-lang/log/proc-macros"
+documentation = "https://docs.rs/log-proc-macros"
+description = """
+Procedual macros used in Rusts lightweight logging facade
+"""
+categories = ["development-tools::debugging"]
+keywords = ["logging"]
+edition = "2018"
+
+[dependencies]
+quote = "1.0"
+
+[lib]
+test = false
+proc-macro = true
+

@@ -276,6 +276,9 @@
 #![cfg_attr(rustbuild, feature(staged_api, rustc_private))]
 #![cfg_attr(rustbuild, unstable(feature = "rustc_private", issue = "27812"))]
 
+// const generics is needed for compile time checks
+#![cfg_attr(feature = "compile_time_filters", feature(const_generics))]
+
 #[cfg(all(not(feature = "std"), not(test)))]
 extern crate core as std;
 
@@ -295,6 +298,11 @@ mod serde;
 
 #[cfg(feature = "kv_unstable")]
 pub mod kv;
+
+#[cfg(feature = "compile_time_filters")]
+mod ct_filter;
+#[cfg(feature = "compile_time_filters")]
+pub use ct_filter::max_level_per_module;
 
 #[cfg(has_atomics)]
 use std::sync::atomic::{AtomicUsize, Ordering};

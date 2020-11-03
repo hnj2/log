@@ -31,7 +31,11 @@
 macro_rules! log {
     (target: $target:expr, $lvl:expr, $message:expr) => ({
         let lvl = $lvl;
-        if lvl <= $crate::STATIC_MAX_LEVEL && lvl <= $crate::max_level() {
+        #[cfg(feature = "compile_time_filters")]
+        let ct_filters_passed = lvl <= $crate::max_level_per_module::<{__log_module_path!()}>();
+        #[cfg(not(feature = "compile_time_filters"))]
+        let ct_filters_passed = true;
+        if lvl <= $crate::STATIC_MAX_LEVEL && ct_filters_passed && lvl <= $crate::max_level() {
             // ensure that $message is a valid format string literal
             let _ = __log_format_args!($message);
             $crate::__private_api_log_lit(
@@ -43,7 +47,11 @@ macro_rules! log {
     });
     (target: $target:expr, $lvl:expr, $($arg:tt)+) => ({
         let lvl = $lvl;
-        if lvl <= $crate::STATIC_MAX_LEVEL && lvl <= $crate::max_level() {
+        #[cfg(feature = "compile_time_filters")]
+        let ct_filters_passed = lvl <= $crate::max_level_per_module::<{__log_module_path!()}>();
+        #[cfg(not(feature = "compile_time_filters"))]
+        let ct_filters_passed = true;
+        if lvl <= $crate::STATIC_MAX_LEVEL && ct_filters_passed && lvl <= $crate::max_level() {
             $crate::__private_api_log(
                 __log_format_args!($($arg)+),
                 lvl,
