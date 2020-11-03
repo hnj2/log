@@ -299,11 +299,6 @@ mod serde;
 #[cfg(feature = "kv_unstable")]
 pub mod kv;
 
-#[cfg(feature = "compile_time_filters")]
-mod ct_filter;
-#[cfg(feature = "compile_time_filters")]
-pub use ct_filter::max_level_per_module;
-
 #[cfg(has_atomics)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -1233,6 +1228,35 @@ where
     }
 }
 
+// Compile time string prefix calculations
+#[cfg(feature = "compile_time_filters")]
+const fn starts_with(p: &str, s: &str) -> bool {
+
+    const fn _starts_with(p: &str, s: &str, i: usize) -> bool {
+        i == 0 || {
+            p.as_bytes()[i-1] == s.as_bytes()[i-1]
+            && _starts_with(p, s, i-1)
+        }
+    }
+
+    p.len() <= s.len() && _starts_with(p, s, p.len())
+}
+
+// An associated constant is need to force the compiler to do the calculation at compile-time
+#[cfg(feature = "compile_time_filters")]
+trait Boolean { const VALUE: bool; }
+
+// This is the struct that will have the associated constant
+#[cfg(feature = "compile_time_filters")]
+#[allow(dead_code)]
+struct StartsWith<const PREFIX: &'static str, const STRING: &'static str>;
+
+// Calculate the associated constant using the const fn implementation
+#[cfg(feature = "compile_time_filters")]
+impl<const PREFIX: &'static str, const STRING: &'static str> Boolean for StartsWith<PREFIX, STRING> {
+    const VALUE: bool = starts_with(PREFIX, STRING);
+}
+
 /// Sets the global maximum log level.
 ///
 /// Generally, this should only be called by the active logging implementation.
@@ -1263,6 +1287,58 @@ pub fn max_level() -> LevelFilter {
     // is by `set_max_level` above, i.e. by casting a `LevelFilter` to `usize`.
     // So any usize stored in `MAX_LOG_LEVEL_FILTER` is a valid discriminant.
     unsafe { mem::transmute(MAX_LOG_LEVEL_FILTER.load(Ordering::Relaxed)) }
+}
+
+/// Returns the maximum log level per module at compile time.
+///
+/// The [`log!`], [`error!`], [`warn!`], [`info!`], [`debug!`], and [`trace!`] macros check
+/// this value and discard any message logged at a higher level.
+///
+/// The maximum level can be controlled with the environment variable `RUST_LOG_FILTERS` at
+/// the time of compilation. This variable consists of semicolon separated filters of the
+/// form `<module_path>=<level>` and at most one default level of the form `<default_level>.
+/// If no default level is used the `Trace` level is used.
+///
+/// If the `compile_time_filters` feature is not used, `Trace` is returned.
+///
+/// # Examples
+/// When compiled with:
+/// ```
+/// RUST_LOG_FILTERS="Warn; problem::module=Trace; problem::module::safe=Error; other_crate=Off"
+/// ```
+/// Then the following asserts with not fail:
+/// ```
+/// use LevelFilter::*;
+/// assert_eq!(Warn,  max_module_level::<"std::mem">());
+/// assert_eq!(Warn,  max_module_level::<"problem">());
+/// assert_eq!(Warn,  max_module_level::<"problem::other">());
+/// assert_eq!(Trace, max_module_level::<"problem::module">());
+/// assert_eq!(Trace, max_module_level::<"problem::module::submodule">());
+/// assert_eq!(Error, max_module_level::<"problem::module::safe">());
+/// assert_eq!(Error, max_module_level::<"problem::module::safe::submodule">());
+/// assert_eq!(Off,   max_module_level::<"other_crate">());
+/// assert_eq!(Off,   max_module_level::<"other_crate::submodule">());
+/// ```
+#[inline(always)]
+pub const fn max_module_level<const MODULE_PATH: &'static str>() -> LevelFilter {
+
+    use LevelFilter::*;
+
+    // <prefix>=<filter> entries look like this:
+    //  if (StartsWith::< "<prefix>" , MODULE_PATH>::VALUE) {
+    //      return <filter>;
+    //  }
+    // These need to be ordered by length (longest first).
+    //
+    // The default filter will simply be returned last:
+    //  <default_filter>
+
+    #[cfg(feature = "compile_time_filters")]
+    log_proc_macros::parse_env_filters!();
+
+    #[cfg(not(feature = "compile_time_filters"))]
+    Trace
+
 }
 
 /// Sets the global logger to a `Box<Log>`.
