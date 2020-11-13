@@ -277,7 +277,7 @@
 #![cfg_attr(rustbuild, unstable(feature = "rustc_private", issue = "27812"))]
 
 // const generics is needed for compile time checks
-#![cfg_attr(feature = "compile_time_filters", feature(const_generics))]
+#![feature(const_generics)]
 
 #[cfg(all(not(feature = "std"), not(test)))]
 extern crate core as std;
